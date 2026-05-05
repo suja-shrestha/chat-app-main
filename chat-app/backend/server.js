@@ -83,13 +83,19 @@ app.delete('/messages/:id', (req, res) => {
   // Find the index of the message with this id
   const index = messages.findIndex((msg) => msg.id === id);
 
+  // Example - trying to delete id 99 which doesn't exist:
+//index = -1  // nothing found!
+// We send back 404 Not Found 
+// Our case - id 2 was found:
+//index = 1   // found at position 1!
+// We skip this if block and continue 
   if (index === -1) {
     // 404 = Not Found
     return res.status(404).json({ error: 'Message not found' });
   }
 
   // Remove the message from the array
-  // splice(index, 1) removes 1 item at the given index
+  // splice(index position of data, 1 item) removes 1 item at the given index
   messages.splice(index, 1);
 
   res.json({ success: 'Message deleted' });
