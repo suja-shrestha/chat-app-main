@@ -1,107 +1,132 @@
-// ── 1. Import Express ──────────────────────────────────────────
+// ── 1. Imports ─────────────────────────────────────────────────
 const express = require('express');
+const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
+// Import auth routes
+const authRoutes = require('./routes/auth');
 
-// ── 2. Import CORS ─────────────────────────────────────────────
-// CORS = Cross Origin Resource Sharing
-// By default, browsers BLOCK requests between different ports
-// Our React app runs on port 3000, backend on port 5000
-// Without CORS, React cannot talk to Express — so we enable it
-const cors = require('cors')
+// Use auth routes — all routes start with /auth
+// So register = POST /auth/register
+// And login   = POST /auth/login
+app.use('/auth', authRoutes);
 
-//create app instance
-//express() returns application object that we can use to define routes and middleware like get(), post(), listen() etc.
+// mongoose lets us talk to MongoDB
+const mongoose = require('mongoose');
+
+// dotenv loads our .env file so we can use process.env.MONGO_URI
+require('dotenv').config();
+
+// Import our Message model (the blueprint)
+const Message = require('./models/Message');
+
+// ── 2. Setup ───────────────────────────────────────────────────
 const app = express();
-
-// Define the port number for the server to listen on
-const PORT = 5000;
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST']
+  }
+});
 
 // ── 3. Middlewares ─────────────────────────────────────────────
-// Middleware = functions that run on EVERY request before your routes
-// They process the request and pass it forward
-
-// This tells Express to accept JSON data in request bodies
-// Without this, req.body will be undefined when React sends data
 app.use(express.json());
-
-// This enables CORS so React (port 3000) can talk to Express (port 5000)
 app.use(cors());
 
-// ── 4. Temporary Database ──────────────────────────────────────
-// We'll use a simple array for now to store messages
-// Later we'll replace this with a real MongoDB database
-let messages = [
-  { id: 1, username: 'Alice', text: 'Hey everyone!', time: '10:00 AM' },
-  { id: 2, username: 'Bob',   text: 'Hello Alice!',  time: '10:01 AM' },
-];
+// ── 4. Connect to MongoDB ──────────────────────────────────────
+// mongoose.connect() opens a connection to our database
+// process.env.MONGO_URI reads from our .env file
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
+    // .then() runs when connection is SUCCESSFUL
+    console.log('Connected to MongoDB ✅');
+  })
+  .catch((error) => {
+    // .catch() runs if connection FAILS
+    console.log('MongoDB connection error:', error);
+  });
 
-// ── 5. Routes ──────────────────────────────────────────────────
+// ── 5. REST API Routes ─────────────────────────────────────────
 
-// GET /messages — fetch all messages
-// React will call this to load the chat history
-app.get('/messages', (req, res) => {
-  // res.json() sends data back as JSON format
-  // JSON is how frontend and backend exchange data
-  res.json(messages);
-});
+// GET /messages — fetch last 50 messages from database
+app.get('/messages', async (req, res) => {
+  // async means this function can use await
+  // await pauses until the database responds
 
-// POST /messages — send a new message
-// React will call this when user hits the Send button
-app.post('/messages', (req, res) => {
-  // req.body contains the data React sent us
-  // Example: { username: 'Charlie', text: 'Hi there!' }
-  const { username, text } = req.body;
+  try {
+    // Message.find() → get ALL messages from database
+    // .sort({ createdAt: 1 }) → oldest first (1 = ascending)
+    // .limit(50) → only get last 50 messages
+    const messages = await Message.find()
+      .sort({ createdAt: 1 })
+      .limit(50);
 
-  // Basic validation — make sure data actually exists
-  if (!username || !text) {
-    // 400 = Bad Request (user sent incomplete data)
-    return res.status(400).json({ error: 'Username and text are required' });
+    // Send them to React
+    res.json(messages);
+  } catch (error) {
+    // If something goes wrong with database
+    res.status(500).json({ error: 'Failed to fetch messages' });
   }
-
-  // Create a new message object
-  const newMessage = {
-    id: messages.length + 1,       // Simple ID for now
-    username: username,
-    text: text,
-    time: new Date().toLocaleTimeString(), // Current time
-  };
-
-  // Add it to our temporary array
-  messages.push(newMessage);
-
-  // 201 = Created (something new was successfully created)
-  res.status(201).json(newMessage);
 });
 
-// DELETE /messages/:id — delete a specific message
-// The :id is a URL parameter — it's dynamic
-// Example: DELETE /messages/2 will delete message with id 2
-app.delete('/messages/:id', (req, res) => {
-  // req.params.id gives us the id from the URL
-  // We convert it to a Number because URL params are always strings
-  const id = Number(req.params.id);
+// DELETE /messages/:id
+app.delete('/messages/:id', async (req, res) => {
+  try {
+    // findByIdAndDelete finds the message by MongoDB's _id
+    // and deletes it in one step
+    const deleted = await Message.findByIdAndDelete(req.params.id);
 
-  // Find the index of the message with this id
-  const index = messages.findIndex((msg) => msg.id === id);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
 
-  // Example - trying to delete id 99 which doesn't exist:
-//index = -1  // nothing found!
-// We send back 404 Not Found 
-// Our case - id 2 was found:
-//index = 1   // found at position 1!
-// We skip this if block and continue 
-  if (index === -1) {
-    // 404 = Not Found
-    return res.status(404).json({ error: 'Message not found' });
+    res.json({ success: 'Message deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete message' });
   }
-
-  // Remove the message from the array
-  // splice(index position of data, 1 item) removes 1 item at the given index
-  messages.splice(index, 1);
-
-  res.json({ success: 'Message deleted' });
 });
 
-// ── 6. Start Server ────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// ── 6. Socket.io ───────────────────────────────────────────────
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  // Handle new message
+  socket.on('sendMessage', async (data) => {
+    try {
+      // Create a new Message document and save to MongoDB
+      // new Message({...}) creates the document
+      // .save() writes it to the database
+      const newMessage = new Message({
+        username: data.username,
+        text: data.text,
+        room: data.room || 'general',
+      });
+
+      // await pauses here until MongoDB confirms it's saved
+      await newMessage.save();
+
+      // Broadcast to ALL users
+      // newMessage now has _id and createdAt from MongoDB
+      io.emit('receiveMessage', newMessage);
+
+    } catch (error) {
+      console.log('Error saving message:', error);
+    }
+  });
+
+  // Typing indicator — same as before
+  socket.on('typing', (username) => {
+    socket.broadcast.emit('typing', username);
+  });
+
+  // Disconnect — same as before
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+// ── 7. Start Server ────────────────────────────────────────────
+server.listen(process.env.PORT, () => {
+  console.log(`Server running on http://localhost:${process.env.PORT}`);
 });
