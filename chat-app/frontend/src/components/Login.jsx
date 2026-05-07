@@ -127,7 +127,7 @@ function Login({ onLogin }) {
 
         {/* Title */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <p style={{ fontSize: '40px' }}>💬</p>
+          <p style={{ fontSize: '40px' }}><img src="/logo.png" alt="ChatApp Logo" /></p>
           <h1 style={{ fontSize: '24px', color: '#534AB7' }}>ChatApp</h1>
           <p style={{ color: '#888', fontSize: '14px' }}>
             {mode === 'login'   && 'Welcome back!'}

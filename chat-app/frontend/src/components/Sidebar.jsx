@@ -1,4 +1,4 @@
-function Sidebar({ username }) {
+function Sidebar({ username, photo, onLogout, onSettingsOpen }) {
   return (
     <div style={{
       width: '220px',
@@ -14,7 +14,7 @@ function Sidebar({ username }) {
         💬 ChatApp
       </h2>
 
-      {/* Rooms section */}
+      {/* Rooms */}
       <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '8px' }}>
         ROOMS
       </p>
@@ -28,18 +28,19 @@ function Sidebar({ username }) {
         # general
       </p>
 
-      {/* Spacer pushes username to bottom */}
       <div style={{ flex: 1 }} />
 
-      {/* Logged in user at bottom */}
+      {/* Bottom user section */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
         padding: '10px',
         background: '#1E1B3A',
-        borderRadius: '8px'
+        borderRadius: '8px',
       }}>
+
+        {/* Avatar — shows photo if exists, initials if not */}
         <div style={{
           width: '32px',
           height: '32px',
@@ -49,12 +50,54 @@ function Sidebar({ username }) {
           alignItems: 'center',
           justifyContent: 'center',
           fontWeight: 'bold',
-          fontSize: '12px'
+          fontSize: '12px',
+          flexShrink: 0,
+          overflow: 'hidden',
         }}>
-          {/* Show first 2 letters of username as avatar */}
-          {username.slice(0, 2).toUpperCase()}
+          {photo ? (
+            <img
+              src={photo}
+              alt="avatar"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            username.slice(0, 2).toUpperCase()
+          )}
         </div>
-        <p style={{ fontSize: '13px' }}>{username}</p>
+
+        <p style={{ fontSize: '13px', flex: 1 }}>{username}</p>
+
+        {/* Settings button */}
+        <button
+          onClick={onSettingsOpen}
+          title="Settings"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#aaa',
+            cursor: 'pointer',
+            fontSize: '16px',
+            padding: '0',
+          }}
+        >
+          ⚙️
+        </button>
+
+        {/* Logout button */}
+        <button
+          onClick={onLogout}
+          title="Logout"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#aaa',
+            cursor: 'pointer',
+            fontSize: '16px',
+            padding: '0',
+          }}
+        >
+          ⏻
+        </button>
       </div>
     </div>
   );
